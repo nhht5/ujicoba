@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Worm Arena - Game Cacing Modern</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <!-- Tone.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+    <style>
+        * {
+            font-family: 'Outfit', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        body {
+            background-color: #090d16;
+            overflow: hidden;
+        }
+
+        .glass-ui {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Pulse glow untuk tombol boost */
+        .boost-active {
+            box-shadow: 0 0 25px rgba(245, 158, 11, 0.8);
+            transform: scale(0.95);
+        }
+
+        .magnet-active {
+            box-shadow: 0 0 25px rgba(168, 85, 247, 0.8);
+        }
+    </style>
+</head>
+<body class="w-screen h-screen relative flex items-center justify-center">
+
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas" class="absolute inset-0 w-full h-full block"></canvas>
+
+    <!-- In-Game UI Overlay -->
+    <div id="ingame-ui" class="absolute inset-0 pointer-events-none hidden z-10">
+        <!-- Top Left: Skor Player & Saldo Koin -->
+        <div class="absolute top-4 left-4 flex flex-col sm:flex-row gap-3 pointer-events-auto">
+            <div class="glass-ui rounded-2xl px-5 py-3 flex items-center space-x-4 shadow-lg border border-slate-700/60">
+                <div>
+                    <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Panjang & Berat</p>
+                    <p id="score-val" class="text-xl sm:text-2xl font-extrabold text-emerald-400">100 m (10 kg)</p>
+                </div>
+            </div>
+            <div class="glass-ui rounded-2xl px-5 py-3 flex items-center space-x-3 shadow-lg border border-slate-700/60">
+                <i class="fa-solid fa-coins text-amber-400 text-xl"></i>
+                <div>
+                    <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Koin Sesi</p>
+                    <p id="ingame-coin-val" class="text-xl sm:text-2xl font-extrabold text-amber-400">0</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Magnet Status Indicator -->
+        <div id="magnet-indicator" class="absolute top-20 left-4 glass-ui rounded-full px-4 py-2 border border-purple-500/50 flex items-center space-x-2 text-purple-300 text-xs font-bold shadow-lg hidden">
+            <i class="fa-solid fa-magnet text-purple-400 animate-bounce"></i>
+            <span>MAGNET AKTIF (<span id="magnet-timer">0</span>s)</span>
+        </div>
+
+        <!-- Top Right: Leaderboard (Top 5) -->
+        <div class="absolute top-4 right-4 glass-ui rounded-2xl p-4 w-52 sm:w-64 pointer-events-auto shadow-lg border border-slate-700/60">
+            <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center justify-between">
+                <span><i class="fa-solid fa-trophy text-amber-400 mr-2"></i> Peringkat Server</span>
+                <span class="text-[10px] text-slate-500">BERAT</span>
+            </h3>
+            <ol id="leaderboard-list" class="space-y-1 text-xs">
+                <!-- Dynamic Items -->
+            </ol>
+        </div>
+
+        <!-- Minimap (Pojok Kanan Bawah) -->
+        <div class="absolute bottom-4 right-4 glass-ui p-1.5 rounded-2xl pointer-events-none z-10 border border-slate-700/60 shadow-xl hidden sm:block">
+            <canvas idminimapCanvas" id="minimapCanvas" width="120" height="120" class="rounded-xl"></canvas>
+        </div>
+
+        <!-- Mobile Boost Button -->
+        <div class="absolute bottom-6 left-6 pointer-events-auto z-10 sm:hidden">
+            <button id="mobile-boost-btn" class="w-20 h-20 rounded-full glass-ui border-2 border-amber-500/50 bg-amber-500/20 text-amber-400 font-extrabold text-sm flex flex-col items-center justify-center active:bg-amber-500 active:text-slate-950 transition-all shadow-lg">
+                <i class="fa-solid fa-bolt text-xl mb-0.5"></i>
+                <span>BOOST</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN MENU & LOBBY OVERLAY -->
+    <div id="ui-overlay" class="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-30 transition-all duration-300">
+        
+        <!-- STEP 1: INITIAL LOGIN SCREEN -->
+        <div id="login-screen" class="glass-ui max-w-md w-full rounded-3xl p-6 sm:p-8 text-center border border-slate-700/80 shadow-2xl relative overflow-hidden">
+            <div class="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-tr from-emerald-500 to-cyan-500 text-slate-950 flex items-center justify-center text-4xl shadow-xl shadow-emerald-500/20 mb-4">
+                <i class="fa-solid fa-worm"></i>
+            </div>
+            <h1 class="text-3xl font-black text-white mb-1 tracking-wide">WORM ARENA</h1>
+            <p class="text-xs text-slate-400 mb-6">Masukkan nama akun Anda untuk memulai petualangan!</p>
+
+            <div class="space-y-4 mb-6">
+                <div>
+                    <label class="block text-left text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Nama Akun Cacing</label>
+                    <input type="text" id="login-name-input" maxlength="12" placeholder="Ketik nama kamu..." class="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 font-semibold focus:outline-none focus:border-emerald-500 text-sm">
+                </div>
+            </div>
+
+            <button id="login-btn" class="w-full py-4 bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-500 hover:opacity-95 text-slate-950 font-black rounded-xl text-base tracking-wider uppercase shadow-xl shadow-emerald-500/25 active:scale-95 transition-all">
+                MASUK KELOBI
+            </button>
+        </div>
+
+        <!-- STEP 2: MAIN LOBBY MENU -->
+        <div id="lobby-screen" class="glass-ui max-w-xl w-full rounded-3xl p-6 sm:p-8 text-center border border-slate-700/80 shadow-2xl relative overflow-hidden hidden">
+            <!-- Header Profil & Saldo Koin -->
+            <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
+                <div class="flex items-center space-x-3 text-left">
+                    <div class="w-12 h-12 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-2xl text-emerald-400">
+                        <i class="fa-solid fa-user-ninja"></i>
+                    </div>
+                    <div>
+                        <h2 id="lobby-player-name" class="font-extrabold text-white text-lg">Pemain</h2>
+                        <span class="text-[11px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20 font-semibold">ONLINE</span>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2 bg-amber-500/10 border border-amber-500/30 px-4 py-2 rounded-2xl">
+                    <i class="fa-solid fa-coins text-amber-400 text-xl"></i>
+                    <span id="lobby-coins" class="text-xl font-extrabold text-amber-400">0</span>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <div class="flex bg-slate-900/80 p-1.5 rounded-2xl mb-6 border border-slate-800">
+                <button id="tab-play" class="flex-1 py-2.5 rounded-xl font-bold text-sm bg-emerald-500 text-slate-950 shadow-md transition-all">
+                    <i class="fa-solid fa-gamepad mr-1"></i> Arena
+                </button>
+                <button id="tab-shop" class="flex-1 py-2.5 rounded-xl font-bold text-sm text-slate-400 hover:text-white transition-all">
+                    <i class="fa-solid fa-store mr-1"></i> Toko Skin
+                </button>
+            </div>
+
+            <!-- TAB CONTENT: ARENA / MAIN -->
+            <div id="content-play" class="space-y-5">
+                <div class="bg-slate-900/60 p-4 rounded-2xl border border-slate-800/80 text-left flex justify-between items-center">
+                    <div>
+                        <p class="text-xs text-slate-400">Rekor Berat Tertinggi</p>
+                        <p id="lobby-high-score" class="text-2xl font-black text-amber-400">0 kg</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs text-slate-400">Skin Aktif</p>
+                        <p id="lobby-active-skin" class="text-sm font-bold text-emerald-400">Emerald Glow</p>
+                    </div>
+                </div>
+
+                <button id="start-game-btn" class="w-full py-4 bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-500 hover:opacity-95 text-slate-950 font-black rounded-xl text-lg tracking-wider uppercase shadow-xl shadow-emerald-500/25 active:scale-95 transition-all flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-play"></i>
+                    <span>MASUK SERVER ARENA</span>
+                </button>
+            </div>
+
+            <!-- TAB CONTENT: TOKO SKIN -->
+            <div id="content-shop" class="hidden space-y-4">
+                <div id="shop-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-64 overflow-y-auto pr-1">
+                    <!-- Dynamic Skin Cards -->
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 3: GAME OVER MODAL -->
+        <div id="gameover-screen" class="glass-ui max-w-md w-full rounded-3xl p-6 sm:p-8 text-center border border-slate-700/80 shadow-2xl relative overflow-hidden hidden">
+            <div class="w-20 h-20 mx-auto rounded-3xl bg-red-500/20 text-red-500 flex items-center justify-center text-4xl shadow-xl mb-4 border border-red-500/30">
+                <i class="fa-solid fa-skull"></i>
+            </div>
+            <h1 class="text-3xl font-black text-white mb-1">CACING MATI!</h1>
+            <p id="gameover-summary" class="text-sm text-slate-400 mb-6">Kamu menabrak cacing lain!</p>
+
+            <div class="bg-slate-900/60 p-4 rounded-2xl border border-slate-800 mb-6 space-y-2 text-left text-sm">
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Berat Akhir:</span>
+                    <span id="go-weight" class="font-bold text-emerald-400">0 kg</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Koin Dipanen:</span>
+                    <span id="go-coins" class="font-bold text-amber-400">+0 Koin</span>
+                </div>
+            </div>
+
+            <button id="back-to-lobby-btn" class="w-full py-4 bg-gradient-to-r from-emerald-400 to-cyan-500 text-slate-950 font-black rounded-xl text-base tracking-wider uppercase shadow-xl active:scale-95 transition-all">
+                KEMBALI KE LOBI
+            </button>
+        </div>
+
+    </div>
+
+    <!-- JavaScript Game Mechanics & Shop Logic -->
+    <script>
+        // Setup Canvas Game & Minimap
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const minimapCanvas = document.getElementById('minimapCanvas');
+        const miniCtx = minimapCanvas.getContext('2d');
+
+        // UI Screens & Controls
+        const uiOverlay = document.getElementById('ui-overlay');
+        const loginScreen = document.getElementById('login-screen');
+        const lobbyScreen = document.getElementById('lobby-screen');
+        const gameoverScreen = document.getElementById('gameover-screen');
+        const ingameUI = document.getElementById('ingame-ui');
+
+        const loginNameInput = document.getElementById('login-name-input');
+        const loginBtn = document.getElementById('login-btn');
+        const startGameBtn = document.getElementById('start-game-btn');
+        const backToLobbyBtn = document.getElementById('back-to-lobby-btn');
+
+        const lobbyPlayerName = document.getElementById('lobby-player-name');
+        const lobbyCoins = document.getElementById('lobby-coins');
+        const lobbyHighScore = document.getElementById('lobby-high-score');
+        const lobbyActiveSkin = document.getElementById('lobby-active-skin');
+        const ingameCoinVal = document.getElementById('ingame-coin-val');
+        const scoreVal = document.getElementById('score-val');
+        const leaderboardList = document.getElementById('leaderboard-list');
+
+        const magnetIndicator = document.getElementById('magnet-indicator');
+        const magnetTimerEl = document.getElementById('magnet-timer');
+        const mobileBoostBtn = document.getElementById('mobile-boost-btn');
+
+        // Tabs
+        const tabPlay = document.getElementById('tab-play');
+        const tabShop = document.getElementById('tab-shop');
+        const contentPlay = document.getElementById('content-play');
+        const contentShop = document.getElementById('content-shop');
+        const shopGrid = document.getElementById('shop-grid');
+
+        // Game World Settings
+        const WORLD_SIZE = 3000;
+        const FOOD_COUNT = 700;
+        const COIN_COUNT = 60;
+        const MAGNET_COUNT = 15;
+        const BOT_COUNT = 14;
+
+        let viewportWidth = window.innerWidth;
+        let viewportHeight = window.innerHeight;
+
+        // Sound System
+        let audioCtxReady = false;
+        function playTone(freq, duration = 0.1) {
+            if (!audioCtxReady) return;
+            try {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 }
+                }).toDestination();
+                synth.volume.value = -12;
+                synth.triggerAttackRelease(freq, duration);
+            } catch(e) {}
+        }
+
+        function initAudio() {
+            if (!audioCtxReady) {
+                Tone.start();
+                audioCtxReady = true;
+            }
+        }
+
+        // Available Skins Catalog
+        const SKINS = [
+            { id: 'emerald', name: 'Emerald Glow', price: 0, colors: { head: '#10b981', body: '#34d399', glow: '#059669' } },
+            { id: 'cyan', name: 'Cyber Cyan', price: 50, colors: { head: '#06b6d4', body: '#22d3ee', glow: '#0891b2' } },
+            { id: 'amber', name: 'Golden Sun', price: 100, colors: { head: '#f59e0b', body: '#fbbf24', glow: '#d97706' } },
+            { id: 'pink', name: 'Neon Pink', price: 150, colors: { head: '#ec4899', body: '#f472b6', glow: '#db2777' } },
+            { id: 'purple', name: 'Shadow Purple', price: 200, colors: { head: '#8b5cf6', body: '#a78bfa', glow: '#7c3aed' } }
+        ];
+
+        // Player Account State (Saved in LocalStorage)
+        let account = {
+            name: '',
+            coins: 0,
+            highScore: 0,
+            activeSkin: 'emerald',
+            unlockedSkins: ['emerald']
+        };
+
+        function loadAccountData() {
+            const saved = localStorage.getItem('worm_account_data');
+            if (saved) {
+                try { account = JSON.parse(saved); } catch(e){}
+            }
+        }
+
+        function saveAccountData() {
+            localStorage.setItem('worm_account_data', JSON.stringify(account));
+            updateLobbyUI();
+        }
+
+        // Pointer / Input State
+        let mousePos = { x: viewportWidth / 2, y: viewportHeight / 2 };
+        let isBoosting = false;
+
+        // Player & Game Objects
+        let playerWorm = null;
+        let bots = [];
+        let foods = [];
+        let coins = [];
+        let magnets = [];
+        let sessionCoins = 0;
+        let isGameRunning = false;
+
+        // Resize Canvas Dynamic
+        function resize() {
+            viewportWidth = window.innerWidth;
+            viewportHeight = window.innerHeight;
+            canvas.width = viewportWidth;
+            canvas.height = viewportHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // -------------------------------------------------------------
+        // Worm Class (Player & AI)
+        // -------------------------------------------------------------
+        class Worm {
+            constructor(id, name, x, y, isBot = false, colorScheme = null) {
+                this.id = id;
+                this.name = name;
+                this.x = x;
+                this.y = y;
+                this.angle = Math.random() * Math.PI * 2;
+                this.targetAngle = this.angle;
+                this.speed = 3;
+                this.normalSpeed = 3;
+                this.boostSpeed = 6;
+                this.radius = 12;
+                this.length = 25;
+                this.segments = [];
+                this.isBot = isBot;
+                this.isBoosting = false;
+                this.isDead = false;
+
+                // Magnet Power-up status
+                this.magnetTime = 0;
+
+                const defaultColors = SKINS[0].colors;
+                this.colors = colorScheme || defaultColors;
+
+                for (let i = 0; i < this.length; i++) {
+                    this.segments.push({ x: this.x - i * 5 * Math.cos(this.angle), y: this.y - i * 5 * Math.sin(this.angle) });
+                }
+
+                this.aiTimer = 0;
+            }
+
+            update() {
+                if (this.isDead) return;
+
+                // Speed calculation
+                this.speed = this.isBoosting && this.length > 15 ? this.boostSpeed : this.normalSpeed;
+
+                if (this.isBoosting && this.length > 15 && Math.random() < 0.3) {
+                    this.length -= 0.1;
+                    const tail = this.segments[this.segments.length - 1];
+                    spawnFoodAt(tail.x + (Math.random() - 0.5) * 10, tail.y + (Math.random() - 0.5) * 10, 1);
+                }
+
+                // Update Magnet Timer
+                if (this.magnetTime > 0) {
+                    this.magnetTime -= 1/60;
+                    if (this.magnetTime <= 0) this.magnetTime = 0;
+
+                    // Pull food, coins & magnets nearby if active
+                    const pullRadius = 250;
+                    
+                    // Pull Foods
+                    foods.forEach(f => {
+                        const dist = Math.hypot(f.x - this.x, f.y - this.y);
+                        if (dist < pullRadius) {
+                            f.x += (this.x - f.x) * 0.12;
+                            f.y += (this.y - f.y) * 0.12;
+                        }
+                    });
+
+                    // Pull Coins
+                    coins.forEach(c => {
+                        const dist = Math.hypot(c.x - this.x, c.y - this.y);
+                        if (dist < pullRadius) {
+                            c.x += (this.x - c.x) * 0.12;
+                            c.y += (this.y - c.y) * 0.12;
+                        }
+                    });
+                }
+
+                // Smooth rotation angle interpolation
+                let angleDiff = this.targetAngle - this.angle;
+                while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                this.angle += angleDiff * 0.12;
+
+                this.x += Math.cos(this.angle) * this.speed;
+                this.y += Math.sin(this.angle) * this.speed;
+
+                // World boundary check
+                if (this.x < 50 || this.x > WORLD_SIZE - 50 || this.y < 50 || this.y > WORLD_SIZE - 50) {
+                    this.die();
+                    return;
+                }
+
+                // Body segments logic
+                this.segments[0] = { x: this.x, y: this.y };
+                const segDist = Math.max(3, this.radius * 0.4);
+
+                for (let i = 1; i < this.segments.length; i++) {
+                    const prev = this.segments[i - 1];
+                    const cur = this.segments[i];
+                    const dx = prev.x - cur.x;
+                    const dy = prev.y - cur.y;
+                    const dist = Math.hypot(dx, dy);
+
+                    if (dist > segDist) {
+                        const angle = Math.atan2(dy, dx);
+                        cur.x = prev.x - Math.cos(angle) * segDist;
+                        cur.y = prev.y - Math.sin(angle) * segDist;
+                    }
+                }
+
+                const targetSegCount = Math.floor(this.length);
+                while (this.segments.length < targetSegCount) {
+                    const last = this.segments[this.segments.length - 1];
+                    this.segments.push({ x: last.x, y: last.y });
+                }
+                while (this.segments.length > targetSegCount) {
+                    this.segments.pop();
+                }
+
+                this.radius = 12 + Math.min(25, (this.length - 25) * 0.1);
+
+                if (this.isBot) {
+                    this.updateAI();
+                }
+            }
+
+            updateAI() {
+                this.aiTimer--;
+                if (this.aiTimer <= 0) {
+                    this.aiTimer = Math.floor(Math.random() * 60) + 30;
+                    let nearestTarget = null;
+                    let minDist = 250;
+
+                    for (let f of [...foods, ...coins, ...magnets]) {
+                        const dist = Math.hypot(f.x - this.x, f.y - this.y);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            nearestTarget = f;
+                        }
+                    }
+
+                    if (nearestTarget) {
+                        this.targetAngle = Math.atan2(nearestTarget.y - this.y, nearestTarget.x - this.x);
+                    } else {
+                        this.targetAngle += (Math.random() - 0.5) * 1.5;
+                    }
+                }
+            }
+
+            draw(cameraX, cameraY) {
+                if (this.isDead) return;
+
+                // Draw Magnet Aura Effect if active
+                if (this.magnetTime > 0) {
+                    const screenX = this.x - cameraX;
+                    const screenY = this.y - cameraY;
+                    ctx.beginPath();
+                    ctx.arc(screenX, screenY, this.radius + 15, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(168, 85, 247, 0.2)';
+                    ctx.strokeStyle = 'rgba(168, 85, 247, 0.6)';
+                    ctx.lineWidth = 2;
+                    ctx.fill();
+                    ctx.stroke();
+                }
+
+                // Draw body segments (Back to Front)
+                for (let i = this.segments.length - 1; i >= 0; i--) {
+                    const seg = this.segments[i];
+                    const screenX = seg.x - cameraX;
+                    const screenY = seg.y - cameraY;
+
+                    if (screenX < -50 || screenX > viewportWidth + 50 || screenY < -50 || screenY > viewportHeight + 50) continue;
+
+                    const isHead = i === 0;
+                    const currentRadius = isHead ? this.radius : this.radius * (1 - (i / this.segments.length) * 0.35);
+
+                    ctx.beginPath();
+                    ctx.arc(screenX, screenY, Math.max(3, currentRadius), 0, Math.PI * 2);
+                    ctx.fillStyle = isHead ? this.colors.head : this.colors.body;
+                    
+                    if (isHead) {
+                        ctx.shadowColor = this.colors.glow;
+                        ctx.shadowBlur = 15;
+                    } else {
+                        ctx.shadowBlur = 0;
+                    }
+
+                    ctx.fill();
+
+                    // Draw eyes on head
+                    if (isHead) {
+                        ctx.shadowBlur = 0;
+                        ctx.fillStyle = '#ffffff';
+
+                        const eyeOffsetAngle = 0.5;
+                        const eyeDistance = this.radius * 0.6;
+                        
+                        const eye1X = screenX + Math.cos(this.angle - eyeOffsetAngle) * eyeDistance;
+                        const eye1Y = screenY + Math.sin(this.angle - eyeOffsetAngle) * eyeDistance;
+                        const eye2X = screenX + Math.cos(this.angle + eyeOffsetAngle) * eyeDistance;
+                        const eye2Y = screenY + Math.sin(this.angle + eyeOffsetAngle) * eyeDistance;
+
+                        ctx.beginPath();
+                        ctx.arc(eye1X, eye1Y, Math.max(2, this.radius * 0.25), 0, Math.PI * 2);
+                        ctx.arc(eye2X, eye2Y, Math.max(2, this.radius * 0.25), 0, Math.PI * 2);
+                        ctx.fill();
+
+                        ctx.fillStyle = '#0f172a';
+                        ctx.beginPath();
+                        ctx.arc(eye1X + Math.cos(this.angle)*1.5, eye1Y + Math.sin(this.angle)*1.5, Math.max(1, this.radius * 0.12), 0, Math.PI * 2);
+                        ctx.arc(eye2X + Math.cos(this.angle)*1.5, eye2Y + Math.sin(this.angle)*1.5, Math.max(1, this.radius * 0.12), 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+
+                ctx.shadowBlur = 0;
+
+                // Draw Name Tag
+                const headScreenX = this.x - cameraX;
+                const headScreenY = this.y - cameraY - this.radius - 10;
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 11px Outfit, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(this.name, headScreenX, headScreenY);
+            }
+
+            die() {
+                if (this.isDead) return;
+                this.isDead = true;
+
+                for (let seg of this.segments) {
+                    if (Math.random() < 0.7) {
+                        spawnFoodAt(
+                            seg.x + (Math.random() - 0.5) * 20, 
+                            seg.y + (Math.random() - 0.5) * 20, 
+                            Math.floor(Math.random() * 3) + 2
+                        );
+                    }
+                }
+
+                if (!this.isBot) {
+                    playTone("G2", 0.4);
+                    handleGameOver();
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Items Spawner (Foods, Coins, Magnets)
+        // -------------------------------------------------------------
+        function spawnFoodAt(x, y, value = 1) {
+            const foodColors = ['#38bdf8', '#4ade80', '#facc15', '#f472b6', '#a78bfa'];
+            foods.push({
+                x, y, value,
+                radius: 3 + value * 1.5,
+                color: foodColors[Math.floor(Math.random() * foodColors.length)],
+                pulse: Math.random() * Math.PI
+            });
+        }
+
+        function spawnCoinAt(x, y) {
+            coins.push({ x, y, radius: 7, pulse: Math.random() * Math.PI });
+        }
+
+        function spawnMagnetAt(x, y) {
+            magnets.push({ x, y, radius: 9 });
+        }
+
+        function initItems() {
+            foods = []; coins = []; magnets = [];
+            for (let i = 0; i < FOOD_COUNT; i++) {
+                spawnFoodAt(
+                    Math.random() * (WORLD_SIZE - 200) + 100,
+                    Math.random() * (WORLD_SIZE - 200) + 100,
+                    Math.random() < 0.15 ? 3 : 1
+                );
+            }
+            for (let i = 0; i < COIN_COUNT; i++) {
+                spawnCoinAt(Math.random() * (WORLD_SIZE - 200) + 100, Math.random() * (WORLD_SIZE - 200) + 100);
+            }
+            for (let i = 0; i < MAGNET_COUNT; i++) {
+                spawnMagnetAt(Math.random() * (WORLD_SIZE - 200) + 100, Math.random() * (WORLD_SIZE - 200) + 100);
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Collisions System
+        // -------------------------------------------------------------
+        function checkCollisions() {
+            const allWorms = [playerWorm, ...bots].filter(w => w && !w.isDead);
+
+            for (let worm of allWorms) {
+                // 1. Food Collisions
+                for (let i = foods.length - 1; i >= 0; i--) {
+                    const f = foods[i];
+                    if (Math.hypot(worm.x - f.x, worm.y - f.y) < worm.radius + f.radius + 5) {
+                        worm.length += f.value * 0.5;
+                        foods.splice(i, 1);
+                        if (worm === playerWorm) playTone("E5", 0.05);
+
+                        if (foods.length < FOOD_COUNT) {
+                            spawnFoodAt(Math.random() * (WORLD_SIZE - 200) + 100, Math.random() * (WORLD_SIZE - 200) + 100, Math.random() < 0.1 ? 3 : 1);
+                        }
+                    }
+                }
+
+                // 2. Coin Collisions (Add money directly)
+                for (let i = coins.length - 1; i >= 0; i--) {
+                    const c = coins[i];
+                    if (Math.hypot(worm.x - c.x, worm.y - c.y) < worm.radius + c.radius + 5) {
+                        coins.splice(i, 1);
+                        if (worm === playerWorm) {
+                            sessionCoins += 1;
+                            account.coins += 1;
+                            ingameCoinVal.textContent = sessionCoins;
+                            saveAccountData();
+                            playTone("B5", 0.1);
+                        }
+                        if (coins.length < COIN_COUNT) {
+                            spawnCoinAt(Math.random() * (WORLD_SIZE - 200) + 100, Math.random() * (WORLD_SIZE - 200) + 100);
+                        }
+                    }
+                }
+
+                // 3. Magnet Power-Up Collisions
+                for (let i = magnets.length - 1; i >= 0; i--) {
+                    const m = magnets[i];
+                    if (Math.hypot(worm.x - m.x, worm.y - m.y) < worm.radius + m.radius + 5) {
+                        magnets.splice(i, 1);
+                        worm.magnetTime = 12; // 12 Detik magnet aktif
+                        if (worm === playerWorm) playTone("A5", 0.2);
+
+                        if (magnets.length < MAGNET_COUNT) {
+                            spawnMagnetAt(Math.random() * (WORLD_SIZE - 200) + 100, Math.random() * (WORLD_SIZE - 200) + 100);
+                        }
+                    }
+                }
+
+                // 4. Head vs Body Collision Check with other Worms
+                for (let other of allWorms) {
+                    if (worm === other) continue;
+                    for (let i = 0; i < other.segments.length; i++) {
+                        const seg = other.segments[i];
+                        if (Math.hypot(worm.x - seg.x, worm.y - seg.y) < worm.radius + other.radius * 0.7) {
+                            worm.die();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Bots Spawner
+        // -------------------------------------------------------------
+        const botNames = ['SlitherPro', 'Viper', 'NeonSnake', 'Shadow', 'Anaconda', 'TurboWorm', 'GlowWorm', 'Alpha', 'Omega', 'Kobra', 'Speedy'];
+
+        function respawnBots() {
+            bots = bots.filter(b => !b.isDead);
+            while (bots.length < BOT_COUNT) {
+                const name = botNames[Math.floor(Math.random() * botNames.length)] + '_' + Math.floor(Math.random() * 99);
+                const rx = Math.random() * (WORLD_SIZE - 400) + 200;
+                const ry = Math.random() * (WORLD_SIZE - 400) + 200;
+                bots.push(new Worm(Date.now() + Math.random(), name, rx, ry, true));
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Main Loop
+        // -------------------------------------------------------------
+        function gameLoop() {
+            if (!isGameRunning) return;
+
+            if (playerWorm && !playerWorm.isDead) {
+                const screenCenterX = viewportWidth / 2;
+                const screenCenterY = viewportHeight / 2;
+                playerWorm.targetAngle = Math.atan2(mousePos.y - screenCenterY, mousePos.x - screenCenterX);
+                playerWorm.isBoosting = isBoosting;
+                playerWorm.update();
+
+                // Calculate Scores (Panjang & Berat)
+                const currentLength = Math.floor(playerWorm.length * 4);
+                const currentWeight = Math.floor(playerWorm.length * 0.4);
+                scoreVal.textContent = `${currentLength} m (${currentWeight} kg)`;
+
+                if (currentWeight > account.highScore) {
+                    account.highScore = currentWeight;
+                    saveAccountData();
+                }
+
+                // Update Magnet Indicator UI
+                if (playerWorm.magnetTime > 0) {
+                    magnetIndicator.classList.remove('hidden');
+                    magnetTimerEl.textContent = Math.ceil(playerWorm.magnetTime);
+                } else {
+                    magnetIndicator.classList.add('hidden');
+                }
+            }
+
+            bots.forEach(bot => bot.update());
+            respawnBots();
+            checkCollisions();
+
+            const cameraX = playerWorm ? playerWorm.x - viewportWidth / 2 : WORLD_SIZE / 2 - viewportWidth / 2;
+            const cameraY = playerWorm ? playerWorm.y - viewportHeight / 2 : WORLD_SIZE / 2 - viewportHeight / 2;
+
+            ctx.clearRect(0, 0, viewportWidth, viewportHeight);
+
+            // 1. Grid Background
+            const gridSize = 80;
+            const startX = - (cameraX % gridSize);
+            const startY = - (cameraY % gridSize);
+            ctx.strokeStyle = 'rgba(30, 41, 59, 0.4)';
+            ctx.lineWidth = 1;
+
+            for (let x = startX; x < viewportWidth; x += gridSize) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, viewportHeight); ctx.stroke();
+            }
+            for (let y = startY; y < viewportHeight; y += gridSize) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(viewportWidth, y); ctx.stroke();
+            }
+
+            // 2. World Border
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 8;
+            ctx.strokeRect(-cameraX, -cameraY, WORLD_SIZE, WORLD_SIZE);
+
+            // 3. Draw Foods
+            foods.forEach(f => {
+                const fx = f.x - cameraX; const fy = f.y - cameraY;
+                if (fx > -20 && fx < viewportWidth + 20 && fy > -20 && fy < viewportHeight + 20) {
+                    f.pulse += 0.05;
+                    ctx.beginPath();
+                    ctx.arc(fx, fy, Math.max(1, f.radius + Math.sin(f.pulse)*0.8), 0, Math.PI * 2);
+                    ctx.fillStyle = f.color;
+                    ctx.shadowColor = f.color; ctx.shadowBlur = 8; ctx.fill();
+                }
+            });
+
+            // 4. Draw Coins
+            coins.forEach(c => {
+                const cx = c.x - cameraX; const cy = c.y - cameraY;
+                if (cx > -20 && cx < viewportWidth + 20 && cy > -20 && cy < viewportHeight + 20) {
+                    c.pulse += 0.08;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, c.radius + Math.sin(c.pulse)*1.2, 0, Math.PI * 2);
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.shadowColor = '#fbbf24'; ctx.shadowBlur = 12; ctx.fill();
+                    ctx.fillStyle = '#fef08a';
+                    ctx.font = 'bold 9px Outfit'; ctx.textAlign = 'center'; ctx.fillText('$', cx, cy + 3);
+                }
+            });
+
+            // 5. Draw Magnets
+            magnets.forEach(m => {
+                const mx = m.x - cameraX; const my = m.y - cameraY;
+                if (mx > -20 && mx < viewportWidth + 20 && my > -20 && my < viewportHeight + 20) {
+                    ctx.beginPath();
+                    ctx.arc(mx, my, m.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = '#a855f7';
+                    ctx.shadowColor = '#c084fc'; ctx.shadowBlur = 12; ctx.fill();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = '9px "Font Awesome 6 Free"'; ctx.textAlign = 'center'; ctx.fillText('\uf076', mx, my + 3);
+                }
+            });
+            ctx.shadowBlur = 0;
+
+            // 6. Draw Worms
+            bots.forEach(b => b.draw(cameraX, cameraY));
+            if (playerWorm) playerWorm.draw(cameraX, cameraY);
+
+            drawMinimap();
+            updateLeaderboardUI();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // -------------------------------------------------------------
+        // Minimap & Leaderboard
+        // -------------------------------------------------------------
+        function drawMinimap() {
+            miniCtx.fillStyle = '#0f172a';
+            miniCtx.fillRect(0, 0, 120, 120);
+            const scale = 120 / WORLD_SIZE;
+
+            miniCtx.fillStyle = '#ef4444';
+            bots.forEach(b => { if (!b.isDead) miniCtx.fillRect(b.x * scale, b.y * scale, 2, 2); });
+
+            if (playerWorm && !playerWorm.isDead) {
+                miniCtx.fillStyle = '#10b981';
+                miniCtx.beginPath();
+                miniCtx.arc(playerWorm.x * scale, playerWorm.y * scale, 3.5, 0, Math.PI * 2);
+                miniCtx.fill();
+            }
+        }
+
+        function updateLeaderboardUI() {
+            const all = [playerWorm, ...bots].filter(w => w && !w.isDead);
+            all.sort((a, b) => b.length - a.length);
+
+            const top5 = all.slice(0, 5);
+            leaderboardList.innerHTML = top5.map((w, idx) => `
+                <li class="flex justify-between items-center ${w === playerWorm ? 'text-emerald-400 font-bold' : 'text-slate-400'}">
+                    <span class="truncate max-w-[110px]">${idx + 1}. ${w.name}</span>
+                    <span class="font-bold">${Math.floor(w.length * 0.4)} kg</span>
+                </li>
+            `).join('');
+        }
+
+        // -------------------------------------------------------------
+        // Lobby UI & Shop Mechanics
+        // -------------------------------------------------------------
+        function updateLobbyUI() {
+            lobbyPlayerName.textContent = account.name || 'Pemain';
+            lobbyCoins.textContent = account.coins;
+            lobbyHighScore.textContent = `${account.highScore} kg`;
+
+            const currentSkinObj = SKINS.find(s => s.id === account.activeSkin) || SKINS[0];
+            lobbyActiveSkin.textContent = currentSkinObj.name;
+
+            renderShop();
+        }
+
+        function renderShop() {
+            shopGrid.innerHTML = SKINS.map(skin => {
+                const isUnlocked = account.unlockedSkins.includes(skin.id);
+                const isActive = account.activeSkin === skin.id;
+
+                return `
+                    <div class="bg-slate-900/90 border ${isActive ? 'border-emerald-500' : 'border-slate-800'} rounded-2xl p-3 text-center flex flex-col justify-between">
+                        <div class="w-10 h-10 mx-auto rounded-full mb-2 flex items-center justify-center shadow-md" style="background: ${skin.colors.head}">
+                            <i class="fa-solid fa-worm text-slate-950"></i>
+                        </div>
+                        <p class="font-bold text-xs text-white mb-1">${skin.name}</p>
+                        ${isActive ? `
+                            <button class="w-full py-1.5 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded-xl border border-emerald-500/40 pointer-events-none">DIPAKAI</button>
+                        ` : isUnlocked ? `
+                            <button onclick="selectSkin('${skin.id}')" class="w-full py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition-all">GUNAKAN</button>
+                        ` : `
+                            <button onclick="buySkin('${skin.id}')" class="w-full py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black rounded-xl transition-all flex items-center justify-center space-x-1">
+                                <i class="fa-solid fa-coins"></i>
+                                <span>${skin.price}</span>
+                            </button>
+                        `}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        window.selectSkin = function(skinId) {
+            account.activeSkin = skinId;
+            saveAccountData();
+        };
+
+        window.buySkin = function(skinId) {
+            const skin = SKINS.find(s => s.id === skinId);
+            if (skin && account.coins >= skin.price) {
+                account.coins -= skin.price;
+                account.unlockedSkins.push(skin.id);
+                account.activeSkin = skin.id;
+                saveAccountData();
+                playTone("C6", 0.2);
+            } else {
+                alert("Koin kamu tidak cukup!");
+            }
+        };
+
+        // -------------------------------------------------------------
+        // Navigation & Flow Control
+        // -------------------------------------------------------------
+        loginBtn.addEventListener('click', () => {
+            const name = loginNameInput.value.trim();
+            if (!name) return;
+            initAudio();
+            account.name = name;
+            saveAccountData();
+
+            loginScreen.classList.add('hidden');
+            lobbyScreen.classList.remove('hidden');
+        });
+
+        tabPlay.addEventListener('click', () => {
+            tabPlay.className = "flex-1 py-2.5 rounded-xl font-bold text-sm bg-emerald-500 text-slate-950 shadow-md transition-all";
+            tabShop.className = "flex-1 py-2.5 rounded-xl font-bold text-sm text-slate-400 hover:text-white transition-all";
+            contentPlay.classList.remove('hidden');
+            contentShop.classList.add('hidden');
+        });
+
+        tabShop.addEventListener('click', () => {
+            tabShop.className = "flex-1 py-2.5 rounded-xl font-bold text-sm bg-emerald-500 text-slate-950 shadow-md transition-all";
+            tabPlay.className = "flex-1 py-2.5 rounded-xl font-bold text-sm text-slate-400 hover:text-white transition-all";
+            contentShop.classList.remove('hidden');
+            contentPlay.classList.add('hidden');
+        });
+
+        startGameBtn.addEventListener('click', () => {
+            sessionCoins = 0;
+            ingameCoinVal.textContent = "0";
+
+            const skinObj = SKINS.find(s => s.id === account.activeSkin) || SKINS[0];
+            playerWorm = new Worm(
+                'player', account.name,
+                WORLD_SIZE / 2 + (Math.random() - 0.5) * 500,
+                WORLD_SIZE / 2 + (Math.random() - 0.5) * 500,
+                false, skinObj.colors
+            );
+
+            initItems();
+            bots = [];
+            respawnBots();
+
+            uiOverlay.classList.add('hidden');
+            ingameUI.classList.remove('hidden');
+            isGameRunning = true;
+            requestAnimationFrame(gameLoop);
+        });
+
+        function handleGameOver() {
+            isGameRunning = false;
+            ingameUI.classList.add('hidden');
+            uiOverlay.classList.remove('hidden');
+
+            document.getElementById('go-weight').textContent = `${Math.floor(playerWorm.length * 0.4)} kg`;
+            document.getElementById('go-coins').textContent = `+${sessionCoins} Koin`;
+
+            lobbyScreen.classList.add('hidden');
+            gameoverScreen.classList.remove('hidden');
+        }
+
+        backToLobbyBtn.addEventListener('click', () => {
+            gameoverScreen.classList.add('hidden');
+            lobbyScreen.classList.remove('hidden');
+            updateLobbyUI();
+        });
+
+        // Pointer Controls
+        window.addEventListener('mousemove', (e) => { mousePos = { x: e.clientX, y: e.clientY }; });
+        window.addEventListener('mousedown', (e) => { if (!e.target.closest('#ui-overlay')) isBoosting = true; });
+        window.addEventListener('mouseup', () => { isBoosting = false; });
+        window.addEventListener('touchmove', (e) => { if (e.touches.length > 0) mousePos = { x: e.touches[0].clientX, y: e.touches[0].clientY }; });
+
+        mobileBoostBtn.addEventListener('touchstart', (e) => { e.preventDefault(); isBoosting = true; mobileBoostBtn.classList.add('boost-active'); });
+        mobileBoostBtn.addEventListener('touchend', (e) => { e.preventDefault(); isBoosting = false; mobileBoostBtn.classList.remove('boost-active'); });
+
+        // Load account on start
+        loadAccountData();
+        if (account.name) {
+            loginScreen.classList.add('hidden');
+            lobbyScreen.classList.remove('hidden');
+            updateLobbyUI();
+        }
+    </script>
+</body>
+</html>

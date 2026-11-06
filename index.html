@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WormNet Social & Game Zone</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .chat-bubble-received {
+            background: rgba(30, 41, 59, 0.9);
+            border-top-left-radius: 4px;
+        }
+
+        .chat-bubble-sent {
+            background: linear-gradient(135deg, #059669, #0d9488);
+            border-top-right-radius: 4px;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-emerald-500 selection:text-slate-950">
+
+    <!-- 1. AUTH SCREEN (LOGIN & REGISTER) -->
+    <div id="auth-screen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
+        <div class="glass-panel w-full max-w-md rounded-3xl p-8 border border-slate-800 shadow-2xl relative overflow-hidden">
+            <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 flex items-center justify-center text-3xl shadow-lg shadow-emerald-500/20 mb-4">
+                <i class="fa-solid fa-users"></i>
+            </div>
+            
+            <h1 class="text-2xl font-extrabold text-center text-white mb-1">Selamat Datang di WormNet</h1>
+            <p class="text-xs text-center text-slate-400 mb-6">Masuk atau daftar untuk bergabung dengan Server Utama!</p>
+
+            <form id="auth-form" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Nama Tampilan (Display Name)</label>
+                    <input type="text" id="input-displayname" required placeholder="Contoh: Alex Rivers" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 transition-all">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Username Unique</label>
+                    <div class="relative">
+                        <span class="absolute left-4 top-3 text-slate-500 text-sm">@</span>
+                        <input type="text" id="input-username" required placeholder="alex_rivers" class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-8 pr-4 py-3 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 transition-all">
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:opacity-95 text-slate-950 font-extrabold rounded-xl text-sm uppercase tracking-wider shadow-lg shadow-emerald-500/20 transition-all active:scale-95">
+                    Masuk ke Komunitas
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 2. MAIN APP CONTAINER -->
+    <div id="main-app" class="hidden flex-1 flex flex-col h-screen overflow-hidden">
+        
+        <!-- TOP NAVIGATION BAR -->
+        <header class="glass-panel border-b border-slate-800/80 px-4 sm:px-6 py-3 flex items-center justify-between z-30">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 flex items-center justify-center text-xl font-black shadow-md shadow-emerald-500/20">
+                    <i class="fa-solid fa-network-wired"></i>
+                </div>
+                <div>
+                    <h2 class="font-extrabold text-white text-base tracking-wide flex items-center">
+                        WormNet <span class="ml-2 text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">v2.0</span>
+                    </h2>
+                    <p class="text-[11px] text-slate-400">Server Komunitas Terintegrasi</p>
+                </div>
+            </div>
+
+            <!-- Profile & Active User -->
+            <div class="flex items-center space-x-4">
+                <div class="hidden sm:flex items-center space-x-3 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-2xl">
+                    <div class="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center font-bold text-xs">
+                        <span id="user-avatar-initial">U</span>
+                    </div>
+                    <div class="text-left">
+                        <p id="user-display-name" class="text-xs font-bold text-white truncate max-w-[120px]">User</p>
+                        <p id="user-handle" class="text-[10px] text-slate-400">@username</p>
+                    </div>
+                </div>
+
+                <button id="logout-btn" class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-red-400 hover:border-red-500/40 transition-all text-xs" title="Keluar">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- MAIN LAYOUT (3 COLUMNS / TABS) -->
+        <div class="flex-1 flex overflow-hidden relative">
+
+            <!-- LEFT SIDEBAR: NAV & MEMBER LIST -->
+            <aside class="w-64 glass-panel border-r border-slate-800/80 hidden md:flex flex-col p-4 space-y-6">
+                <!-- Navigation Menu -->
+                <div class="space-y-1">
+                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-2">Navigasi Utama</p>
+                    <button id="nav-feed" onclick="switchTab('feed')" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-bold bg-emerald-500 text-slate-950 transition-all shadow-md">
+                        <i class="fa-solid fa-newspaper text-sm"></i>
+                        <span>Feed Postingan</span>
+                    </button>
+                    <button id="nav-chat" onclick="switchTab('chat')" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:bg-slate-900 hover:text-white transition-all">
+                        <i class="fa-solid fa-comments text-sm"></i>
+                        <span>Grup Server Utama</span>
+                        <span class="ml-auto bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-0.5 rounded-full border border-emerald-500/30">Live</span>
+                    </button>
+                    <button id="nav-game" onclick="switchTab('game')" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:bg-slate-900 hover:text-white transition-all">
+                        <i class="fa-solid fa-gamepad text-sm"></i>
+                        <span>Game Zone</span>
+                    </button>
+                </div>
+
+                <hr class="border-slate-800">
+
+                <!-- Online Members -->
+                <div class="flex-1 flex flex-col overflow-hidden">
+                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-2 flex justify-between items-center">
+                        <span>Anggota Terdaftar</span>
+                        <span id="member-count" class="text-emerald-400">0</span>
+                    </p>
+                    <div id="member-list" class="flex-1 overflow-y-auto space-y-2 pr-1 text-xs">
+                        <!-- Dynamic Members List -->
+                    </div>
+                </div>
+            </aside>
+
+            <!-- MAIN CONTENT AREA -->
+            <main class="flex-1 flex flex-col bg-slate-950 overflow-hidden relative">
+
+                <!-- 1. FEED TAB CONTENT -->
+                <section id="tab-feed-content" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 max-w-3xl mx-auto w-full">
+                    <!-- Create Post Card -->
+                    <div class="glass-panel p-4 sm:p-5 rounded-3xl border border-slate-800 space-y-3">
+                        <div class="flex space-x-3">
+                            <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                                <span id="post-avatar-initial">U</span>
+                            </div>
+                            <textarea id="post-input" rows="3" placeholder="Apa yang ingin kamu bagikan ke komunitas hari ini?" class="w-full bg-slate-900 border border-slate-800 rounded-2xl p-3 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 transition-all resize-none"></textarea>
+                        </div>
+
+                        <div class="flex justify-between items-center pt-2 border-t border-slate-900">
+                            <button id="add-img-btn" class="text-xs text-slate-400 hover:text-emerald-400 flex items-center space-x-2 transition-all">
+                                <i class="fa-solid fa-image text-emerald-500"></i>
+                                <span>Tambah URL Gambar</span>
+                            </button>
+                            <button id="submit-post-btn" class="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:opacity-95 text-slate-950 font-extrabold rounded-xl text-xs uppercase tracking-wider shadow-md transition-all active:scale-95">
+                                Posting
+                            </button>
+                        </div>
+                        <input type="text" id="post-img-url" placeholder="Paste URL Gambar (opsional)..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 hidden">
+                    </div>
+
+                    <!-- Postings Feed Stream -->
+                    <div id="posts-stream" class="space-y-4">
+                        <!-- Dynamic Post Items -->
+                    </div>
+                </section>
+
+                <!-- 2. CHAT GRUP SERVER CONTENT -->
+                <section id="tab-chat-content" class="hidden flex-1 flex flex-col h-full bg-slate-950">
+                    <!-- Chat Header -->
+                    <div class="glass-panel px-6 py-3 border-b border-slate-800 flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-400 flex items-center justify-center text-sm font-bold">
+                                <i class="fa-solid fa-server"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-xs font-bold text-white">Grup Server Utama</h3>
+                                <p class="text-[10px] text-slate-400">Semua anggota terdaftar otomatis masuk ke obrolan ini</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chat Messages Stream -->
+                    <div id="chat-messages" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+                        <!-- Dynamic Chat Messages -->
+                    </div>
+
+                    <!-- Chat Input Bar -->
+                    <div class="glass-panel p-3 border-t border-slate-800">
+                        <form id="chat-form" class="flex space-x-2">
+                            <input type="text" id="chat-input" placeholder="Ketik pesan ke seluruh anggota server..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 transition-all">
+                            <button type="submit" class="px-5 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold rounded-xl text-sm transition-all flex items-center justify-center">
+                                <i class="fa-solid fa-paper-plane"></i>
+                            </button>
+                        </form>
+                    </div>
+                </section>
+
+                <!-- 3. GAME ZONE CONTENT -->
+                <section id="tab-game-content" class="hidden flex-1 flex flex-col items-center justify-center p-4 bg-slate-950">
+                    <div class="glass-panel max-w-xl w-full rounded-3xl p-8 text-center border border-slate-800 space-y-6">
+                        <div class="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-tr from-amber-500 to-emerald-500 text-slate-950 flex items-center justify-center text-4xl shadow-xl shadow-amber-500/20">
+                            <i class="fa-solid fa-worm"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-2xl font-black text-white mb-2">Game Zone: Worm Arena</h2>
+                            <p class="text-xs text-slate-400">Mainkan game cacing bertema slither dengan fitur Power-up Magnet, Koin Saldo, dan Toko Skin!</p>
+                        </div>
+
+                        <div class="bg-slate-900/80 p-4 rounded-2xl border border-slate-800 text-left text-xs space-y-2">
+                            <div class="flex items-center space-x-2 text-emerald-400 font-bold">
+                                <i class="fa-solid fa-circle-check"></i>
+                                <span>Pergerakan Smooth 360 Derajat & Bot AI</span>
+                            </div>
+                            <div class="flex items-center space-x-2 text-amber-400 font-bold">
+                                <i class="fa-solid fa-circle-check"></i>
+                                <span>Magnet otomatis menarik makanan di sekitar</span>
+                            </div>
+                            <div class="flex items-center space-x-2 text-purple-400 font-bold">
+                                <i class="fa-solid fa-circle-check"></i>
+                                <span>Toko Skin & Leaderboard Berat Cacing</span>
+                            </div>
+                        </div>
+
+                        <a href="game_cacing_modern_worm_arena.html" target="_blank" class="block w-full py-4 bg-gradient-to-r from-emerald-400 to-cyan-500 text-slate-950 font-black rounded-2xl text-base uppercase tracking-wider shadow-lg shadow-emerald-500/20 hover:opacity-95 transition-all">
+                            <i class="fa-solid fa-play mr-2"></i> Buka Game Cacing Arena
+                        </a>
+                    </div>
+                </section>
+
+            </main>
+        </div>
+
+        <!-- MOBILE BOTTOM NAVIGATION BAR -->
+        <nav class="md:hidden glass-panel border-t border-slate-800 flex justify-around p-2 z-30">
+            <button onclick="switchTab('feed')" class="flex flex-col items-center py-1 text-slate-400 focus:text-emerald-400">
+                <i class="fa-solid fa-newspaper text-base mb-1"></i>
+                <span class="text-[10px] font-bold">Feed</span>
+            </button>
+            <button onclick="switchTab('chat')" class="flex flex-col items-center py-1 text-slate-400 focus:text-emerald-400">
+                <i class="fa-solid fa-comments text-base mb-1"></i>
+                <span class="text-[10px] font-bold">Grup Server</span>
+            </button>
+            <button onclick="switchTab('game')" class="flex flex-col items-center py-1 text-slate-400 focus:text-emerald-400">
+                <i class="fa-solid fa-gamepad text-base mb-1"></i>
+                <span class="text-[10px] font-bold">Game</span>
+            </button>
+        </nav>
+
+    </div>
+
+    <!-- Application Script Logic -->
+    <script>
+        // State Management
+        let currentUser = null;
+        let users = [];
+        let posts = [];
+        let chatMessages = [];
+
+        // DOM Elements
+        const authScreen = document.getElementById('auth-screen');
+        const mainApp = document.getElementById('main-app');
+        const authForm = document.getElementById('auth-form');
+
+        const inputDisplayName = document.getElementById('input-displayname');
+        const inputUsername = document.getElementById('input-username');
+
+        const userAvatarInitial = document.getElementById('user-avatar-initial');
+        const postAvatarInitial = document.getElementById('post-avatar-initial');
+        const userDisplayName = document.getElementById('user-display-name');
+        const userHandle = document.getElementById('user-handle');
+        const logoutBtn = document.getElementById('logout-btn');
+
+        const tabFeedContent = document.getElementById('tab-feed-content');
+        const tabChatContent = document.getElementById('tab-chat-content');
+        const tabGameContent = document.getElementById('tab-game-content');
+
+        const navFeed = document.getElementById('nav-feed');
+        const navChat = document.getElementById('nav-chat');
+        const navGame = document.getElementById('nav-game');
+
+        const memberList = document.getElementById('member-list');
+        const memberCount = document.getElementById('member-count');
+
+        const postInput = document.getElementById('post-input');
+        const postImgUrl = document.getElementById('post-img-url');
+        const addImgBtn = document.getElementById('add-img-btn');
+        const submitPostBtn = document.getElementById('submit-post-btn');
+        const postsStream = document.getElementById('posts-stream');
+
+        const chatMessagesStream = document.getElementById('chat-messages');
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+
+        // Load Initial Data from LocalStorage
+        function loadStorageData() {
+            const savedUsers = localStorage.getItem('wormnet_users');
+            const savedPosts = localStorage.getItem('wormnet_posts');
+            const savedChats = localStorage.getItem('wormnet_chats');
+            const savedCurrent = localStorage.getItem('wormnet_current_user');
+
+            if (savedUsers) users = JSON.parse(savedUsers);
+            else {
+                users = [
+                    { name: 'Admin Server', username: 'admin', avatar: 'A' },
+                    { name: 'Slither Master', username: 'slither_pro', avatar: 'S' }
+                ];
+                saveStorageData();
+            }
+
+            if (savedPosts) posts = JSON.parse(savedPosts);
+            else {
+                posts = [
+                    {
+                        id: 1,
+                        authorName: 'Admin Server',
+                        authorUsername: 'admin',
+                        content: 'Selamat datang di WormNet! Jangan lupa untuk menyapa anggota lain di Grup Server Utama.',
+                        imageUrl: '',
+                        likes: 3,
+                        timestamp: 'Beberapa saat yang lalu'
+                    }
+                ];
+                saveStorageData();
+            }
+
+            if (savedChats) chatMessages = JSON.parse(savedChats);
+            else {
+                chatMessages = [
+                    { sender: 'Admin Server', username: 'admin', text: 'Halo semuanya! Selamat datang di grup obrolan server utama.', timestamp: '12:00' }
+                ];
+                saveStorageData();
+            }
+
+            if (savedCurrent) {
+                currentUser = JSON.parse(savedCurrent);
+                showMainApp();
+            }
+        }
+
+        function saveStorageData() {
+            localStorage.setItem('wormnet_users', JSON.stringify(users));
+            localStorage.setItem('wormnet_posts', JSON.stringify(posts));
+            localStorage.setItem('wormnet_chats', JSON.stringify(chatMessages));
+            if (currentUser) localStorage.setItem('wormnet_current_user', JSON.stringify(currentUser));
+        }
+
+        // Auth Logic
+        authForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = inputDisplayName.value.trim();
+            const username = inputUsername.value.trim().toLowerCase().replace(/\s+/g, '');
+
+            if (!name || !username) return;
+
+            let existingUser = users.find(u => u.username === username);
+            if (!existingUser) {
+                existingUser = { name, username, avatar: name.charAt(0).toUpperCase() };
+                users.push(existingUser);
+                
+                // Bot / Admin greeting chat for new user
+                chatMessages.push({
+                    sender: 'System Server',
+                    username: 'system',
+                    text: `${name} (@${username}) baru saja bergabung dengan server! Selamat datang!`,
+                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                });
+            }
+
+            currentUser = existingUser;
+            saveStorageData();
+            showMainApp();
+        });
+
+        logoutBtn.addEventListener('click', () => {
+            localStorage.removeItem('wormnet_current_user');
+            currentUser = null;
+            authScreen.classList.remove('hidden');
+            mainApp.classList.add('hidden');
+        });
+
+        function showMainApp() {
+            authScreen.classList.add('hidden');
+            mainApp.classList.remove('hidden');
+
+            userDisplayName.textContent = currentUser.name;
+            userHandle.textContent = `@${currentUser.username}`;
+            userAvatarInitial.textContent = currentUser.name.charAt(0).toUpperCase();
+            postAvatarInitial.textContent = currentUser.name.charAt(0).toUpperCase();
+
+            renderMemberList();
+            renderPosts();
+            renderChats();
+        }
+
+        // Navigation Tabs
+        window.switchTab = function(tabName) {
+            tabFeedContent.classList.add('hidden');
+            tabChatContent.classList.add('hidden');
+            tabGameContent.classList.add('hidden');
+
+            navFeed.className = "w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:bg-slate-900 hover:text-white transition-all";
+            navChat.className = "w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:bg-slate-900 hover:text-white transition-all";
+            navGame.className = "w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:bg-slate-900 hover:text-white transition-all";
+
+            if (tabName === 'feed') {
+                tabFeedContent.classList.remove('hidden');
+                navFeed.className = "w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-bold bg-emerald-500 text-slate-950 transition-all shadow-md";
+            } else if (tabName === 'chat') {
+                tabChatContent.classList.remove('hidden');
+                navChat.className = "w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-bold bg-emerald-500 text-slate-950 transition-all shadow-md";
+                chatMessagesStream.scrollTop = chatMessagesStream.scrollHeight;
+            } else if (tabName === 'game') {
+                tabGameContent.classList.remove('hidden');
+                navGame.className = "w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-bold bg-emerald-500 text-slate-950 transition-all shadow-md";
+            }
+        };
+
+        // Render Online Members
+        function renderMemberList() {
+            memberCount.textContent = users.length;
+            memberList.innerHTML = users.map(u => `
+                <div class="flex items-center space-x-3 p-2 rounded-xl bg-slate-900/50 border border-slate-800/60">
+                    <div class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-xs">
+                        ${u.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div class="truncate">
+                        <p class="font-bold text-white text-xs truncate">${u.name}</p>
+                        <p class="text-[10px] text-slate-500">@${u.username}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Feed & Postings Logic
+        addImgBtn.addEventListener('click', () => {
+            postImgUrl.classList.toggle('hidden');
+        });
+
+        submitPostBtn.addEventListener('click', () => {
+            const content = postInput.value.trim();
+            const imageUrl = postImgUrl.value.trim();
+
+            if (!content) return;
+
+            const newPost = {
+                id: Date.now(),
+                authorName: currentUser.name,
+                authorUsername: currentUser.username,
+                content: content,
+                imageUrl: imageUrl,
+                likes: 0,
+                timestamp: 'Baru saja'
+            };
+
+            posts.unshift(newPost);
+            saveStorageData();
+            renderPosts();
+
+            postInput.value = '';
+            postImgUrl.value = '';
+            postImgUrl.classList.add('hidden');
+        });
+
+        function renderPosts() {
+            postsStream.innerHTML = posts.map(p => `
+                <div class="glass-panel p-5 rounded-3xl border border-slate-800 space-y-3">
+                    <div class="flex justify-between items-start">
+                        <div class="flex space-x-3">
+                            <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-bold text-sm">
+                                ${p.authorName.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-white text-sm">${p.authorName}</h4>
+                                <p class="text-[11px] text-slate-400">@${p.authorUsername} • ${p.timestamp}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-sm text-slate-200 leading-relaxed">${p.content}</p>
+
+                    ${p.imageUrl ? `<img src="${p.imageUrl}" class="rounded-2xl w-full max-h-80 object-cover border border-slate-800">` : ''}
+
+                    <div class="flex items-center space-x-4 pt-2 border-t border-slate-900 text-xs text-slate-400">
+                        <button onclick="likePost(${p.id})" class="flex items-center space-x-1.5 hover:text-emerald-400 transition-all">
+                            <i class="fa-regular fa-heart"></i>
+                            <span>${p.likes} Suka</span>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        window.likePost = function(postId) {
+            const post = posts.find(p => p.id === postId);
+            if (post) {
+                post.likes += 1;
+                saveStorageData();
+                renderPosts();
+            }
+        };
+
+        // Chat Server Logic
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const text = chatInput.value.trim();
+            if (!text) return;
+
+            const msg = {
+                sender: currentUser.name,
+                username: currentUser.username,
+                text: text,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+
+            chatMessages.push(msg);
+            saveStorageData();
+            renderChats();
+
+            chatInput.value = '';
+            chatMessagesStream.scrollTop = chatMessagesStream.scrollHeight;
+        });
+
+        function renderChats() {
+            chatMessagesStream.innerHTML = chatMessages.map(m => {
+                const isMe = m.username === currentUser.username;
+                return `
+                    <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'}">
+                        <span class="text-[10px] text-slate-400 mb-1 px-1">${m.sender} (@${m.username}) • ${m.timestamp}</span>
+                        <div class="max-w-xs sm:max-w-md p-3.5 rounded-2xl text-xs text-white ${isMe ? 'chat-bubble-sent' : 'chat-bubble-received border border-slate-800'}">
+                            ${m.text}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Initialize App
+        loadStorageData();
+    </script>
+</body>
+</html>
